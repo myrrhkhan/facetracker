@@ -1,31 +1,104 @@
 import cv2
-import os
+from tkinter import *
+from tkinter import ttk
+from threading import Thread
+import time
 
+# Global variables
+camera_previews = {}
+selected_cameras = []
+running = True
+
+# List available cameras
 def list_cameras():
     index = 0
     cameras = []
     while True:
         cap = cv2.VideoCapture(index)
-        if not cap.read()[0]:  # Check if camera is available
+        if not cap.read()[0]:  # Check if the camera is available
             break
-        cameras.append(f"Camera {index}")
+        cameras.append(index)
         cap.release()
         index += 1
     return cameras
 
-def preview_camera(index):
+# Function to update a specific camera preview
+def update_preview(index, label):
     cap = cv2.VideoCapture(index)
-    while True:
+    while running:
         ret, frame = cap.read()
         if not ret:
             break
-        cv2.imshow(f"Preview - Camera {index}", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):  # Quit on 'q'
-            break
-    cap.release()
-    cv2.destroyAllWindows()
+        frame = cv2.resize(frame, (320, 240))  # Resize for display
 
+        # Encode frame to a Tk-compatible format
+        img_data = cv2.imencode('.ppm', frame)[1].tobytes()
+        
+        # Schedule update to the Tkinter UI
+        root.after(0, update_label, label, img_data)
+        time.sleep(0.03)  # Add delay to reduce CPU usage
+    cap.release()
+
+# Function to update the label in the main thread
+def update_label(label, img_data):
+    img = PhotoImage(data=img_data)
+    label.configure(image=img)
+    label.image = img
+
+# Function to stop all previews
+def stop_previews():
+    global running
+    running = False
+    for index, thread in camera_previews.items():
+        thread["thread"].join()
+
+# Function to handle camera selection
+def submit_selection():
+    global selected_cameras
+    selected_cameras = [camera_list.get(i) for i in camera_list.curselection()]
+    root.quit()
+
+# Start the GUI
+root = Tk()
+root.title("Camera Selection")
+frm = ttk.Frame(root, padding=10)
+frm.grid()
+
+# Get the available cameras
 cameras = list_cameras()
-for i in range(len(cameras)):
-    print(cameras[i])
-    preview_camera(i)
+
+# Create a Listbox for camera selection
+ttk.Label(frm, text="Available Cameras:").grid(column=0, row=0, sticky=W)
+camera_list = Listbox(frm, selectmode=MULTIPLE, height=6)
+for cam in cameras:
+    camera_list.insert(END, f"Camera {cam}")
+camera_list.grid(column=0, row=1, sticky=(W, E))
+
+# Preview frames for each camera
+preview_frame = ttk.Frame(frm)
+preview_frame.grid(column=1, row=0, rowspan=2, sticky=(N, S, E, W))
+
+for i, cam in enumerate(cameras):
+    ttk.Label(preview_frame, text=f"Camera {cam}").grid(column=0, row=i, sticky=W)
+    lbl = Label(preview_frame)
+    lbl.grid(column=1, row=i, sticky=W)
+
+    # Start preview threads
+    thread = Thread(target=update_preview, args=(cam, lbl), daemon=True)
+    camera_previews[cam] = {"thread": thread}
+    thread.start()
+
+# Add Submit and Quit buttons
+ttk.Button(frm, text="Submit", command=submit_selection).grid(column=0, row=2, sticky=W)
+ttk.Button(frm, text="Quit", command=root.destroy).grid(column=1, row=2, sticky=E)
+
+# Run the Tkinter event loop
+root.mainloop()
+
+# Stop all previews when GUI closes
+stop_previews()
+
+# Output selected cameras
+print("Selected cameras:", selected_cameras)
+
+print("outside thread")
