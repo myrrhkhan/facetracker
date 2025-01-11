@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.10)
+project(camstitcher)
+find_package(OpenCV REQUIRED)
+add_executable(camstitcher get_cameras.cpp)
+target_link_libraries(camstitcher ${OpenCV_LIBS})
