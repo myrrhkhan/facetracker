@@ -1,26 +1,22 @@
+#include "opencv2/stitching.hpp"
 #include <iostream>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
 #include <stdio.h>
 
-int main(int, char **) {
-  cv::Mat cam_frame1;
-  cv::Mat cam_frame2;
+int preview_device(int device_ID) {
+  cv::Mat frame;
   //--- INITIALIZE VIDEOCAPTURE
-  cv::VideoCapture cap1;
-  cv::VideoCapture cap2;
+  cv::VideoCapture cap;
   // open the default camera using default API
   // cap.open(0);
   // OR advance usage: select any API backend
-  int cam1ID = 1; // 0 = open default camera
-  int cam2ID = 2;
-  int apiID = cv::CAP_ANY; // 0 = autodetect default API
+  int api_ID = cv::CAP_ANY; // 0 = autodetect default API
   // open selected camera using selected API
-  cap1.open(cam1ID, apiID);
-  cap2.open(cam2ID, apiID);
+  cap.open(device_ID, api_ID);
   // check if we succeeded
-  if (!cap1.isOpened() || !cap2.isOpened()) {
+  if (!cap.isOpened()) {
     std::cerr << "ERROR! Unable to open camera\n";
     return -1;
   }
@@ -29,19 +25,41 @@ int main(int, char **) {
             << "Press any key to terminate" << std::endl;
   for (;;) {
     // wait for a new frame from camera and store it into 'frame'
-    cap1.read(cam_frame1);
-    cap2.read(cam_frame2);
+    cap.read(frame);
     // check if we succeeded
-    if (cam_frame1.empty() || cam_frame2.empty()) {
+    if (frame.empty()) {
       std::cerr << "ERROR! blank frame grabbed\n";
-      break;
+      return -1;
     }
     // show live and wait for a key with timeout long enough to show images
-    imshow("Camera 1", cam_frame1);
-    imshow("Camera 2", cam_frame2);
+    imshow("Live", frame);
     if (cv::waitKey(5) >= 0)
       break;
   }
   // the camera will be deinitialized automatically in VideoCapture destructor
-  return 0;
+  return device_ID;
+}
+
+int main(int, char **) {
+  int ids[10];
+  int idx;
+  for (int device_ID = 0; device_ID < 10; device_ID++) {
+    if (preview_device(device_ID) != -1) {
+      ids[idx] = device_ID;
+      idx++;
+    }
+  }
+  for (int i = 0; i < idx; i++) {
+    std::cout << ids[i] << std::endl;
+  }
+
+  int device_ID_1, device_ID_2;
+  std::cout << "Choose first camera" << std::endl;
+  std::cin >> device_ID_1;
+  std::cout << "Choose second camera" << std::endl;
+  std::cin >> device_ID_2;
+
+  cv::Mat pano;
+  cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
+  // https://docs.opencv.org/4.x/d8/d19/tutorial_stitcher.html
 }
